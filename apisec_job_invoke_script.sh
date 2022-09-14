@@ -74,7 +74,23 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                  echo "Checking Status...."
 
                 passPercent=$(curl -s --location --request GET "${FX_HOST}/api/v1/runs/${runId}" --header "Authorization: Bearer "$token""| jq -r '.["data"]|.ciCdStatus')
-		numCritical=$(curl -s --location --request GET "${FX_HOST}/api/v1/projects/8adc809e83359f9101833c45583c525e/auto-suggestions/active?envId=8adc809e83359f9101833c4558435260&severity=all&page=0&pageSize=10&sort=severity&sortType=ASC'" --header "Authorization: Bearer "$token"" | grep -o 'Critical' | wc -l)
+		numCritical=$(curl 'https://cloud.apisec.ai/api/v1/projects/8adc809e83359f9101833c45583c525e/auto-suggestions/active?envId=8adc809e83359f9101833c4558435260&severity=all&page=0&pageSize=10&sort=severity&sortType=ASC' \
+  -H 'authority: cloud.apisec.ai' \
+  -H 'accept: application/json, text/plain, */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkYXZlLnBpc2thaUBnbWFpbC5jb20iLCJzY29wZXMiOiJST0xFX1VTRVIiLCJpYXQiOjE2NjMxNjUxMjQsImV4cCI6MTY2MzI1MTUyNH0.xU808ZM-NIKDUroQuci58UsBKYesy6sRoleQ1ggGWTI' \
+  -H 'cache-control: no-cache' \
+  -H 'cookie: _ga=GA1.2.1217966161.1663165109; _gid=GA1.2.288485626.1663165109; _gat_gtag_UA_146241883_1=1' \
+  -H 'pragma: no-cache' \
+  -H 'referer: https://cloud.apisec.ai/' \
+  -H 'sec-ch-ua: "Google Chrome";v="105", "Not)A;Brand";v="8", "Chromium";v="105"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36' \
+  --compressed | grep -o 'Critical' | wc -l)
 
                         IFS=':' read -r -a array <<< "$passPercent"
 
