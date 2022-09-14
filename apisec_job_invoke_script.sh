@@ -91,8 +91,8 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                         echo "-----------------------------------------------"
                         echo "Scan Successfully Completed"
 			echo "Critical Vulnerabilities" $numCritical
-			if [ "$taskStatus" == "COMPLETED" ];then
-				echo "Critical Vulnerabilities identified, failing build
+			if [ "$numCritical" > 0 ];then
+				echo "Critical Vulnerabilities identified, failing build"
 				exit 1
 			fi
                         exit 0
