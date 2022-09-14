@@ -74,6 +74,7 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                  echo "Checking Status...."
 
                 passPercent=$(curl -s --location --request GET "${FX_HOST}/api/v1/runs/${runId}" --header "Authorization: Bearer "$token""| jq -r '.["data"]|.ciCdStatus')
+		numCritical=$(curl -s --location --request GET "${FX_HOST}/api/v1/projects/8adc809e83359f9101833c45583c525e/auto-suggestions/active?envId=8adc809e83359f9101833c4558435260&severity=all&page=0&pageSize=10&sort=severity&sortType=ASC'" --header "Authorization: Bearer "$token"")
 
                         IFS=':' read -r -a array <<< "$passPercent"
 
