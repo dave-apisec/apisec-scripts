@@ -74,7 +74,7 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                  echo "Checking Status...."
 
                 passPercent=$(curl -s --location --request GET "${FX_HOST}/api/v1/runs/${runId}" --header "Authorization: Bearer "$token""| jq -r '.["data"]|.ciCdStatus')
-		numCritical=$(curl -s --location --request GET "${FX_HOST}/api/v1/projects/8adc809e83359f9101833c45583c525e/auto-suggestions/active?envId=8adc809e83359f9101833c4558435260&severity=all&page=0&pageSize=10&sort=severity&sortType=ASC'" --header "Authorization: Bearer "$token"")
+		numCritical=$(curl -s --location --request GET "${FX_HOST}/api/v1/projects/8adc809e83359f9101833c45583c525e/auto-suggestions/active?envId=8adc809e83359f9101833c4558435260&severity=all&page=0&pageSize=10&sort=severity&sortType=ASC'" --header "Authorization: Bearer "$token"" | grep -o 'Critical' | wc -l)
 
                         IFS=':' read -r -a array <<< "$passPercent"
 
@@ -90,6 +90,11 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                         echo  "Run detail link ${FX_HOST}${array[7]}"
                         echo "-----------------------------------------------"
                         echo "Scan Successfully Completed"
+			echo "Critical Vulnerabilities" $numCritical
+			if [ "$taskStatus" == "COMPLETED" ];then
+				echo "Critical Vulnerabilities identified, failing build
+				exit 1
+			fi
                         exit 0
 
                 fi
