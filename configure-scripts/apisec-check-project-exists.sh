@@ -33,9 +33,6 @@ fi
 
 token=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "'${FX_USER}'", "password": "'${FX_PWD}'"}' ${FX_HOST}/login | jq -r .token)
 
-echo "generated token is:" $token
-echo " "
-
 dto=$(curl  -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
 PROJECT_ID=$(echo "$dto" | jq -r '.id')
 
@@ -50,5 +47,3 @@ echo $PROJECT_ID
 # prof_names_count=$(echo ${#prof_names_count[*]})
 
 
-
-echo "Script Execution is finished."
