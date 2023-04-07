@@ -1,7 +1,7 @@
 #!/bin/bash
 # Begin
 
-TEMP=$(getopt -n "$0" -a -l "host:,username:,password:,project:,profile:,scanner:,profileScanner:,emailReport:,reportType:,tags:,fail-on-vuln-severity:,openApiSpecUrl:,openAPISpecFile:,internal_OpenApiSpecUrl:,specType:,refresh-playbooks:,outputfile:,tier:,envName:,authName:,app_username:,app_password:,app_endPointUrl:,app_token_param:" -- -- "$@")
+TEMP=$(getopt -n "$0" -a -l "host:,username:,password:,project:,profile:,scanner:,outputfile:,emailReport:,reportType:,fail-on-vuln-severity:,refresh-playbooks:,openAPISpecUrl:,openAPISpecFile:,internal_OpenAPISpecUrl:,specType:,profileScanner:,envName:,authName:,app_username:,app_password:,app_endPointUrl:,app_token_param:,baseUrl:,category:,tier:,tags:" -- -- "$@")
 
     [ $? -eq 0 ] || exit
 
@@ -10,47 +10,51 @@ TEMP=$(getopt -n "$0" -a -l "host:,username:,password:,project:,profile:,scanner
     while [ $# -gt 0 ]
     do
              case "$1" in
-        		    --host) FX_HOST="$2"; shift;;
+                    --host) FX_HOST="$2"; shift;;
                     --username) FX_USER="$2"; shift;;
                     --password) FX_PWD="$2"; shift;;
                     --project) FX_PROJECT_NAME="$2"; shift;;
-                    --profile) JOB_NAME="$2"; shift;;                    
+                    --profile) PROFILE_NAME="$2"; shift;;                    
                     --scanner) REGION="$2"; shift;;
+                    --outputfile) OUTPUT_FILENAME="$2"; shift;;
+		    
                     --emailReport) FX_EMAIL_REPORT="$2"; shift;;
                     --reportType) FX_REPORT_TYPE="$2"; shift;;
 
                     # To Fail script execution on Vulnerable severity
                     --fail-on-vuln-severity) FAIL_ON_VULN_SEVERITY="$2"; shift;;
-                    --oas) OAS="$2"; shift;;
+
 
                     # For Refreshing Project Playbooks
                     --refresh-playbooks) REFRESH_PLAYBOOKS="$2"; shift;;
 
                     # For Project Registeration via OpenSpecUrl
-                    --openApiSpecUrl) OPEN_API_SPEC_URL="$2"; shift;;
-
-                    # For Project Registeration via OpenSpecUrl
-                    --internal_OpenApiSpecUrl) INTERNAL_OPEN_API_SPEC_URL="$2"; shift;;
-                    --specType) SPEC_TYPE="$2"; shift;;
+                    --openAPISpecUrl) OPEN_API_SPEC_URL="$2"; shift;;
 
                     # For Project Registeration via OpenSpecFile
                     --openAPISpecFile) openText="$2"; shift;;
 
+                    # For Project Registeration via OpenSpecUrl
+                    --internal_OpenAPISpecUrl) INTERNAL_OPEN_API_SPEC_URL="$2"; shift;;
+                    --specType) SPEC_TYPE="$2"; shift;;
+
                     # For Project Profile To be Updated with a scanner
                     --profileScanner) PROFILE_SCANNER="$2"; shift;;
-
-                    --outputfile) OUTPUT_FILENAME="$2"; shift;;		    
-                    --tags) FX_TAGS="$2"; shift;;
-
-                    --tier) TIER="$2"; shift;;
-
+		    
                     # For Project Credentials Update
                     --envName) ENV_NAME="$2"; shift;;                        
                     --authName) AUTH_NAME="$2"; shift;;       
                     --app_username) APP_USER="$2"; shift;;
                     --app_password) APP_PWD="$2"; shift;; 
                     --app_endPointUrl) ENDPOINT_URL="$2"; shift;;
-                    --app_token_param) TOKEN_PARAM="$2"; shift;;                                    
+                    --app_token_param) TOKEN_PARAM="$2"; shift;;
+		    
+		    # To update BaseUrl
+                    --baseUrl) BASE_URL="$2"; shift;;
+
+                    --category) CAT="$2"; shift;;
+                    --tier) TIER="$2"; shift;;		    
+                    --tags) FX_TAGS="$2"; shift;;		                    
                     --) shift;;
              esac
              shift;
@@ -68,6 +72,15 @@ TEMP=$(getopt -n "$0" -a -l "host:,username:,password:,project:,profile:,scanner
 if [ "$FX_HOST" = "" ];
 then
 FX_HOST="https://cloud.apisec.ai"
+fi
+
+if [ "$FX_PROJECT_NAME" != "" ]; then
+      PROJECT_NAME=$( echo "$FX_PROJECT_NAME" | sed 's/-/ /g' | sed 's/@/ /g' | sed 's/#/ /g' |  sed 's/&/ /g' | sed 's/*/ /g' |  sed 's/(/ /g' | sed 's/)/ /g' | sed 's/=/ /g' | sed 's/+/ /g' | sed 's/~/ /g' | sed 's/\// /g' | sed 's/\\/ /g' | sed 's/\^/ /g' | sed 's/\;/ /g' | sed 's/\:/ /g' | sed 's/\[/ /g' | sed 's/\]/ /g' | sed 's/\./ /g' | sed 's/\,/ /g')
+      FX_PROJECT_NAME=$( echo "$FX_PROJECT_NAME" | sed 's/ /%20/g' |  sed 's/-/%20/g' | sed 's/@/%20/g' | sed 's/#/%20/g' |  sed 's/&/%20/g' | sed 's/*/%20/g' |  sed 's/(/%20/g' | sed 's/)/%20/g' | sed 's/=/%20/g' | sed 's/+/%20/g' | sed 's/~/%20/g' | sed 's/\//%20/g' | sed 's/\\/%20/g' | sed 's/\^/%20/g' | sed 's/\;/%20/g' | sed 's/\:/%20/g' | sed 's/\[/%20/g' | sed 's/\]/%20/g' | sed 's/\./%20/g' | sed 's/\,/%20/g')
+fi
+
+if   [ "$PROFILE_NAME" == ""  ]; then
+        PROFILE_NAME=Master
 fi
 
 FX_SCRIPT=""
@@ -106,6 +119,10 @@ else
 
 fi
 
+# For Refreshing Project Playbooks
+if   [ "$REFRESH_PLAYBOOKS" == ""  ]; then
+        REFRESH_PLAYBOOKS=false
+fi
 
 # For Project Profile To be Updated with a scanner
 if   [ "$PROFILE_SCANNER" != ""  ];  then
@@ -129,74 +146,80 @@ then
     TOKEN_PARAM=".info.token"
 fi
 
-# For Refreshing Project Playbooks
-if   [ "$REFRESH_PLAYBOOKS" == ""  ]; then
-        REFRESH_PLAYBOOKS=false
+# For Project BaseUrl Update
+if   [ "$BASE_URL" == ""  ]; then
+        BASE_URL_FLAG=false
+else 
+        BASE_URL_FLAG=true
 fi
-
 
 
 token=$(curl -s -H "Content-Type: application/json" -X POST -d '{"username": "'${FX_USER}'", "password": "'${FX_PWD}'"}' ${FX_HOST}/login | jq -r .token)
 
 echo "generated token is:" $token
-echo " "
-
-
+echo " "     
 # For Project Registeration via OpenSpecUrl
 if [ "$OAS" = true ]; then
 
-     getProjectName=$(curl -s -X GET "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" -H "accept: */*"  --header "Authorization: Bearer "$token"" | jq -r '.data|.name')
-
-     if [ "$getProjectName" == null ];
-     then
-                data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'${FX_PROJECT_NAME}'","openAPISpec":"'${OPEN_API_SPEC_URL}'","planType":"ENTERPRISE","isFileLoad": false,"personalizedCoverage":{"auths":[]}}' | jq -r '.data')                
+     getProjectName=$(curl -s -X GET "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" -H "accept: */*"  --header "Authorization: Bearer "$token"" | jq -r '.data|.name')          
+     if [ "$getProjectName" == null ];then
+                echo "Registering Project '${PROJECT_NAME}' via OpenAPISpecUrl method!!"
+                response=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'"${PROJECT_NAME}"'","openAPISpec":"'${OPEN_API_SPEC_URL}'","planType":"ENTERPRISE","isFileLoad": false,"source":"FILE","personalizedCoverage":{"auths":[]}}')
+                message=$(jq -r '.messages' <<< "$response")                          
+                data=$(jq -r '.data' <<< "$response")
                 project_name=$(jq -r '.name' <<< "$data")
                 project_id=$(jq -r '.id' <<< "$data")
+
                 sleep 5
-                dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
-                projectId=$(echo "$dto" | jq -r '.id')
+                #dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
+                #projectId=$(echo "$dto" | jq -r '.id')                
+                #curl -s -X PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" -d "$dto" > /dev/null
+                if [ -z "$project_id" ] || [  "$project_id" == null ]; then
+                        echo "Project Id is $project_id/empty" > /dev/null
+                        echo "Error Message: $message"
+                        echo " "
+                        exit 1
+                else
+                        playbookTaskStatus="In_progress"
+                        echo "playbookTaskStatus = " $playbookTaskStatus
+                        retryCount=0
+                        pCount=0
 
-                curl -s -X PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" -d "$dto" > /dev/null
-     
-                playbookTaskStatus="In_progress"
-                echo "playbookTaskStatus = " $playbookTaskStatus
-                retryCount=0
-                pCount=0
+                        while [ "$playbookTaskStatus" == "In_progress" ]
+                                 do
+                                      if [ $pCount -eq 0 ]; then
+                                           echo "Checking playbooks generate task Status...."
+                                      fi
+                                      pCount=`expr $pCount + 1`  
+                                      retryCount=`expr $retryCount + 1`  
+                                      sleep 2
 
-                while [ "$playbookTaskStatus" == "In_progress" ]
-                        do
-                            if [ $pCount -eq 0 ]; then
-                                 echo "Checking playbooks generate task Status...."
-                            fi
-                            pCount=`expr $pCount + 1`  
-                            retryCount=`expr $retryCount + 1`  
-                            sleep 2
+                                      playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${project_id}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
+                                      #playbookTaskStatus="In_progress"
+                                      if [ "$playbookTaskStatus" == "Done" ]; then
+                                            echo " "
+                                            echo "Playbooks generation task for the registered project '$PROJECT_NAME' is succesfully completed!!!"                                 
+                                            echo "ProjectName: '$project_name'"
+                                            echo "ProjectId: $project_id"
+                                            echo 'Script Execution is Done.'
+                                            exit 0
+                                      fi
 
-                            playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${projectId}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
-                            #playbookTaskStatus="In_progress"
-                            if [ "$playbookTaskStatus" == "Done" ]; then
-                                 echo "Playbooks generation task for the registered project $FX_PROJECT_NAME is succesfully completed!!!"                                 
-                                 echo "ProjectName: $project_name"
-                                 echo "ProjectId: $project_id"
-                                 echo 'Script Execution is Done.'
-                                 exit 0
-                            fi
-
-                            if [ $retryCount -ge 55  ]; then
-                                 echo " "
-                                 retryCount=`expr $retryCount \* 2`  
-                                 echo "Playbooks Generation Task Status $playbookTaskStatus even after $retryCount seconds, so halting/breaking script execution!!!"
-                                 exit 1
-                            fi
-                        done
-                REFRESH_PLAYBOOKS=false
-
+                                      if [ $retryCount -ge 55  ]; then
+                                           echo " "
+                                           retryCount=`expr $retryCount \* 2`  
+                                           echo "Playbooks Generation Task Status $playbookTaskStatus even after $retryCount seconds, so halting/breaking script execution!!!"
+                                           exit 1
+                                      fi
+                                 done
+                        REFRESH_PLAYBOOKS=false
+                fi   
      else
-             echo "Updating Project ${FX_PROJECT_NAME} via OpenAPISpecUrl method!!"                          
+             echo "Updating Project '${PROJECT_NAME}' via OpenAPISpecUrl method!!"
              dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
              projectId=$(echo "$dto" | jq -r '.id')
              orgId=$(echo "$dto" | jq -r '.org.id')             
-             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'${FX_PROJECT_NAME}'","openAPISpec":"'${OPEN_API_SPEC_URL}'","openText": "","isFileLoad":false}' | jq -r '.data')
+             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'"${PROJECT_NAME}"'","openAPISpec":"'${OPEN_API_SPEC_URL}'","openText": "","isFileLoad":false}' | jq -r '.data')
              echo ' '             
              project_name=$(jq -r '.name' <<< "$data")
              project_id=$(jq -r '.id' <<< "$data")
@@ -217,8 +240,9 @@ if [ "$OAS" = true ]; then
                         playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${projectId}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
                 
                         if [ "$playbookTaskStatus" == "Done" ]; then
+                              echo " "
                               echo "Project update via OpenAPISpecUrl  and playbooks refresh task is succesfully completed!!!"
-                              echo "ProjectName: $project_name"
+                              echo "ProjectName: '$project_name'"
                               echo "ProjectId: $project_id"
                               echo " "
                               #echo 'Script Execution is Done.'
@@ -242,41 +266,71 @@ if [ "$OASFile" = true ]; then
       if [[ "$fileExt" == *"yaml"* ]] ||  [[ "$fileExt" == *"yml"* ]]; then
              echo "yaml file upload option is used."
              openText=$(yq -r -o=json $openText)
-             openText=$(echo $openText |  jq . -R |  tr -d ' ')
+             openText=$(echo $openText |  jq . -Rc)
       fi
 
       if [[ "$fileExt" == *"json"* ]]; then
              echo "json file upload option is used."
              openText=$(cat "$openText" )
-             openText=$(echo $openText |  jq . -R |  tr -d ' ')
+             openText=$(echo $openText |  jq . -Rc )
       fi
 
       getProjectNameFile=$(curl -s -X GET "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" -H "accept: */*"  --header "Authorization: Bearer "$token"" | jq -r '.data|.name')
       if [ "$getProjectNameFile" == null ]; then
-             echo "Registering Project ${FX_PROJECT_NAME} via fileupload method!!"
-             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'${FX_PROJECT_NAME}'","openAPISpec":"none","planType":"ENTERPRISE","isFileLoad": "true","openText": '${openText}',"source": "API","personalizedCoverage":{"auths":[]}}'  | jq -r '.data') 
-
+             echo "Registering Project '${PROJECT_NAME}' via fileupload method!!"                          
+             response=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'"${PROJECT_NAME}"'","openAPISpec":"none","planType":"ENTERPRISE","isFileLoad": "true","openText": '"${openText}"',"source": "API","personalizedCoverage":{"auths":[]}}')                                       
+             message=$(jq -r '.messages' <<< "$response")                          
+             data=$(jq -r '.data' <<< "$response")
              echo ' '
              project_name=$(jq -r '.name' <<< "$data")
              project_id=$(jq -r '.id' <<< "$data")
 
              if [ -z "$project_id" ] || [  "$project_id" == null ]; then
                    echo "Project Id is $project_id/empty" > /dev/null
+                   echo "Error Message: $message"
+                   echo " "
                    exit 1
              else
-      
-                    echo "Successfully created the project."
-                    echo "ProjectName: $project_name"
-                    echo "ProjectId: $project_id"
-                    echo 'Script Execution is Done.'
-                    exit 0
+
+                  playbookTaskStatus="In_progress"
+                  echo "playbookTaskStatus = " $playbookTaskStatus
+                  retryCount=0
+                  pCount=0
+
+                  while [ "$playbookTaskStatus" == "In_progress" ]
+                            do
+                                if [ $pCount -eq 0 ]; then
+                                      echo "Checking playbooks generate task Status...."
+                                fi
+                                pCount=`expr $pCount + 1`  
+                                retryCount=`expr $retryCount + 1`  
+                                sleep 2
+
+                                playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${project_id}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
+                                #playbookTaskStatus="In_progress"
+                                if [ "$playbookTaskStatus" == "Done" ]; then
+                                       echo " "
+                                       echo "Playbooks generation task for the registered project '$PROJECT_NAME' is succesfully completed!!!"                                 
+                                       echo "ProjectName: '$project_name'"
+                                       echo "ProjectId: $project_id"
+                                       echo 'Script Execution is Done.'
+                                       exit 0
+                                fi
+
+                                if [ $retryCount -ge 55  ]; then
+                                       echo " "
+                                       retryCount=`expr $retryCount \* 2`  
+                                       echo "Playbooks Generation Task Status $playbookTaskStatus even after $retryCount seconds, so halting/breaking script execution!!!"
+                                       exit 1
+                                fi
+                            done      
              fi
       else
-             echo "Updating Project ${FX_PROJECT_NAME} via fileupload method!!"
+             echo "Updating Project '${PROJECT_NAME}' via fileupload method!!"
              dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
              projectId=$(echo "$dto" | jq -r '.id')
              orgId=$(echo "$dto" | jq -r '.org.id')
-             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'${FX_PROJECT_NAME}'","openAPISpec":"None","openText": '${openText}',"isFileLoad":true}' | jq -r '.data')
+             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'"${PROJECT_NAME}"'","openAPISpec":"None","openText": '"${openText}"',"isFileLoad":true}' | jq -r '.data')
              echo ' '
              project_name=$(jq -r '.name' <<< "$data")
              project_id=$(jq -r '.id' <<< "$data")
@@ -298,6 +352,7 @@ if [ "$OASFile" = true ]; then
                         playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${projectId}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
                 
                         if [ "$playbookTaskStatus" == "Done" ]; then
+                              echo " "
                               echo "OpenAPISpecFile upload and playbooks refresh task is succesfully completed!!!"
                               echo "ProjectName: $project_name"
                               echo "ProjectId: $project_id"
@@ -312,20 +367,22 @@ if [ "$OASFile" = true ]; then
                              echo "Playbook Regenerate Task Status is $playbookTaskStatus even after $retryCount seconds, so halting script execution!!!"
                              exit 1
                         fi                            
-                    done       
+                    done    
+   
 
       fi
 
 fi
 
-# For Project Registeration/Update via OpenSpecFile
+# For Project Registeration/Update via a combination of OpenSpecUrl and OpenSpecFile
 if [ "$INTERNAL_SPEC_FLAG" = true ]; then      
       fileExt=$(echo $SPEC_TYPE)
       if [[ "$fileExt" == *"yaml"* ]] ||  [[ "$fileExt" == *"yml"* ]]; then
              echo "yaml file upload option is used."
-             wget $INTERNAL_OPEN_API_SPEC_URL -O open-api-spec.yaml             
+             wget $INTERNAL_OPEN_API_SPEC_URL -O open-api-spec.yaml
+             openText1=open-api-spec.yaml            
              openText=$(yq -r -o=json $openText1)
-             openText=$(echo $openText |  jq . -R |  tr -d ' ')
+             openText=$(echo $openText |  jq . -Rc)
              rm -rf open-api-spec.yaml
       fi
 
@@ -334,35 +391,67 @@ if [ "$INTERNAL_SPEC_FLAG" = true ]; then
              wget $INTERNAL_OPEN_API_SPEC_URL -O open-api-spec.json
              openText1=open-api-spec.json             
              openText=$(cat "$openText1" )
-             openText=$(echo $openText |  jq . -R |  tr -d ' ')
+             openText=$(echo $openText |  jq . -Rc)
              rm -rf open-api-spec.json
       fi      
       getProjectNameFile=$(curl -s -X GET "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" -H "accept: */*"  --header "Authorization: Bearer "$token"" | jq -r '.data|.name')
       if [ "$getProjectNameFile" == null ]; then
-             echo "Registering Project ${FX_PROJECT_NAME} via fileupload method!!"
-             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'${FX_PROJECT_NAME}'","openAPISpec":"none","planType":"ENTERPRISE","isFileLoad": "true","openText": '${openText}',"source": "API","personalizedCoverage":{"auths":[]}}'  | jq -r '.data') 
-
+             echo "Registering Project '${PROJECT_NAME}' via fileupload method!!"
+             response=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'"${PROJECT_NAME}"'","openAPISpec":"none","planType":"ENTERPRISE","isFileLoad": "true","openText": '"${openText}"',"source": "API","personalizedCoverage":{"auths":[]}}')                                       
+             message=$(jq -r '.messages' <<< "$response")                          
+             data=$(jq -r '.data' <<< "$response")
              echo ' '
              project_name=$(jq -r '.name' <<< "$data")
              project_id=$(jq -r '.id' <<< "$data")
+             #data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request POST "${FX_HOST}/api/v1/projects" --header "Authorization: Bearer "$token"" -d  '{"name":"'"${PROJECT_NAME}"'","openAPISpec":"none","planType":"ENTERPRISE","isFileLoad": "true","openText": '${openText}',"source": "API","personalizedCoverage":{"auths":[]}}'  | jq -r '.data') 
+
+            #  echo ' '
+            #  project_name=$(jq -r '.name' <<< "$data")
+            #  project_id=$(jq -r '.id' <<< "$data")
 
              if [ -z "$project_id" ] || [  "$project_id" == null ]; then
                    echo "Project Id is $project_id/empty" > /dev/null
+                   echo "Error Message: $message"
                    exit 1
              else
-      
-                    echo "Successfully created the project."
-                    echo "ProjectName: $project_name"
-                    echo "ProjectId: $project_id"
-                    echo 'Script Execution is Done.'
-                    exit 0
+                  playbookTaskStatus="In_progress"
+                  echo "playbookTaskStatus = " $playbookTaskStatus
+                  retryCount=0
+                  pCount=0
+
+                  while [ "$playbookTaskStatus" == "In_progress" ]
+                            do
+                                  if [ $pCount -eq 0 ]; then
+                                        echo "Checking playbooks generate task Status...."
+                                  fi
+                                  pCount=`expr $pCount + 1`  
+                                  retryCount=`expr $retryCount + 1`  
+                                  sleep 10
+                                  playbookTaskStatus=$(curl -s -X GET "${FX_HOST}/api/v1/events/project/${project_id}/Sync" -H "accept: */*" -H "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '."data".status')
+                                  #playbookTaskStatus="In_progress"
+                                  if [ "$playbookTaskStatus" == "Done" ]; then
+                                         echo " "
+                                         echo "Playbooks generation task for the registered project '$PROJECT_NAME' is succesfully completed!!!"                                 
+                                         echo "ProjectName: '$project_name'"
+                                         echo "ProjectId: $project_id"
+                                         echo 'Script Execution is Done.'
+                                         exit 0
+                                  fi
+
+                                  if [ $retryCount -ge 55  ]; then
+                                         echo " "
+                                         retryCount=`expr $retryCount \* 2`  
+                                         echo "Playbooks Generation Task Status $playbookTaskStatus even after $retryCount seconds, so halting/breaking script execution!!!"
+                                         exit 1
+                                  fi
+                            done
              fi
       else
-             echo "Updating Project ${FX_PROJECT_NAME} via fileupload method!!"
+             echo "Updating Project '${PROJECT_NAME}' via fileupload method!!"
              dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
              projectId=$(echo "$dto" | jq -r '.id')
              orgId=$(echo "$dto" | jq -r '.org.id')
-             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'${FX_PROJECT_NAME}'","openAPISpec":"None","openText": '${openText}',"isFileLoad":true}' | jq -r '.data')
+             data=$(curl -s  -H "Accept: application/json" -H "Content-Type: application/json" --location --request PUT "${FX_HOST}/api/v1/projects/${projectId}/refresh-specs" --header "Authorization: Bearer "$token"" -d  '{"id":"'${projectId}'","org":{"id":"'${orgId}'"},"name":"'"${PROJECT_NAME}"'","openAPISpec":"None","openText": '"${openText}"',"isFileLoad":true}' | jq -r '.data')
              echo ' '
              project_name=$(jq -r '.name' <<< "$data")
              project_id=$(jq -r '.id' <<< "$data")
@@ -586,61 +675,90 @@ if   [ "$AUTH_FLAG" = true  ]; then
 
 fi
 
+# For Project BaseUrl Update
+if [ "$BASE_URL_FLAG" = true ]; then 
+      dto=$(curl -s --location --request GET  "${FX_HOST}/api/v1/projects/find-by-name/${FX_PROJECT_NAME}" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data')
+      PROJECT_ID=$(echo "$dto" | jq -r '.id')
+      data=$(curl -s --location --request GET "${FX_HOST}/api/v1/envs/projects/${PROJECT_ID}?page=0&pageSize=25" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" | jq -r '.data[]')
+      for row in $(echo "${data}" | jq -r '. | @base64'); 
+         do
+               _jq() {
+                    echo ${row} | base64 --decode | jq -r ${1}
+                }
+                eName=$(echo $(_jq '.') | jq  -r '.name')
+                eId=$(echo $(_jq '.') | jq  -r '.id') 
+    
+               if [ "$ENV_NAME" == "$eName"  ]; then
+                     echo "Updating $ENV_NAME environment with $BASE_URL as baseurl in $PROJECT_NAME project!!"
+                     dto=$(echo $(_jq '.') | jq '.baseUrl = "'${BASE_URL}'"')
+                     updatedData=$(curl -s --location --request PUT "${FX_HOST}/api/v1/projects/$PROJECT_ID/env/$eId" --header "Accept: application/json" --header "Content-Type: application/json" --header "Authorization: Bearer "$token"" -d "$dto" | jq -r '.data')
+                     updatedBaseUrl=$(echo "$updatedData" | jq -r '.baseUrl')
+                     
+                     echo " "
+                     echo "ProjectName: $PROJECT_NAME"
+                     echo "ProjectId: $PROJECT_ID"
+                     echo "EnvironmentName: $ENV_NAME"
+                     echo "EnvironmentId: $eId"
+                     echo "UpdatedBaseUrl: $updatedBaseUrl"
+                     echo " "                    
+               fi
+        done
 
+fi
 #URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}"
 #URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&&categories=ABAC_Level1,%20ABAC_Level2,%20ABAC_Level3,%20InvalidAuth,%20InvalidAuthEmpty,%20InvalidAuthSQL,%20Unsecured,%20Excessive_Data_Exposure,%20Incremental_Ids,%20incremental_ids_l2,%20Pii,%20Sensitive_Data_Exposure,%20sensitive_data_exposure_l2,%20ADoS,%20ratelimit_authenticated,%20ratelimit_unauthenticated,%20RBAC,%20cors_config,%20tls_headers,%20http_authentication_scheme,%20Linux_Command_Injection,%20NoSQL_Injection,%20sql_injection_timebound,%20NoSQL_Injection_Filter,%20sql_injection_filter,%20XSS_Injection,%20Windows_Command_Injection,%20open_api_spec_compliance,%20disable_user_after_5_failed_login_attempts,%20error_logging,%20insufficient_logging,%20insufficient_monitoring,%20log4j_injection,%20resource_not_found_logging,%20strong_and_unique_password,%20insecure_cookies,%20SLA,%20SimpleGET&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}"
 #url=$( echo "$URL" | sed 's/ /%20/g' )
 #echo "The request is $url"
 
-case "$TIER" in "tier1")  URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=InvalidAuth,%20InvalidAuthEmpty,%20InvalidAuthSQL,%20Unsecured&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+case "$TIER" in "tier0")  URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=InvalidAuth,%20InvalidAuthEmpty,%20InvalidAuthSQL,%20Unsecured&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 1 Categories will be run: 'Broken_Authentication' 'InvalidAuth' 'InvalidAuthEmpty' 'InvalidAuthSQL'" ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
-                 "tier2") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=ABAC_Level1,%20ABAC_Level2,%20ABAC_Level3,%20RBAC&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier1") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=ABAC_Level1,%20ABAC_Level2,%20ABAC_Level3,%20RBAC&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 2 Categories will be run: 'ABAC_Level1' ABAC_Level2' 'ABAC_Level3' 'RBAC'" ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 "tier3") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=Linux_Command_Injection,%20NoSQL_Injection,%20sql_injection_timebound,%20NoSQL_Injection_Filter,%20sql_injection_filter,%20XSS_Injection,%20Windows_Command_Injection,%20log4j_injection&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier2") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=Linux_Command_Injection,%20NoSQL_Injection,%20sql_injection_timebound,%20NoSQL_Injection_Filter,%20sql_injection_filter,%20XSS_Injection,%20Windows_Command_Injection,%20log4j_injection&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 3 Categories will be run: 'Linux_Command_Injection' 'NoSQL_Injection' 'Sql_injection_timebound' 'NoSQL_Injection_Filter' 'Sql_injection_filter' 'XSS_Injection' 'Windows_Command_Injection' 'Log4j_injection'" ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 "tier4") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=open_api_spec_compliance,%20disable_user_after_5_failed_login_attempts,%20error_logging,%20insufficient_logging,%20insufficient_monitoring,%20resource_not_found_logging,%20strong_and_unique_password&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier3") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=open_api_spec_compliance,%20disable_user_after_5_failed_login_attempts,%20error_logging,%20insufficient_logging,%20insufficient_monitoring,%20resource_not_found_logging,%20strong_and_unique_password&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 4 Categories will be run: 'Open_api_spec_compliance' 'Disable_user_after_5_failed_login_attempts' 'Error_logging' 'Insufficient_logging' 'Insufficient_monitoring' 'Resource_not_found_logging' 'Strong_and_unique_password' " ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 "tier5") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=cors_config,%20tls_headers,%20http_authentication_scheme,%20insecure_cookies&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier4") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=cors_config,%20tls_headers,%20http_authentication_scheme,%20insecure_cookies&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 5 Categories will be run: 'Cors_config' 'Tls_headers' 'Http_authentication_scheme' 'Insecure_cookies' " ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 "tier6") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&&categories=ADoS,%20ratelimit_authenticated,%20ratelimit_unauthenticated&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier5") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&&categories=ADoS,%20ratelimit_authenticated,%20ratelimit_unauthenticated&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 6 Categories will be run: 'ADoS' 'Ratelimit_authenticated' 'Ratelimit_unauthenticated' " ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 "tier7") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&categories=Excessive_Data_Exposure,%20Incremental_Ids,%20incremental_ids_l2,%20Pii,%20Sensitive_Data_Exposure,%20sensitive_data_exposure_l2&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 "tier6") URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=Excessive_Data_Exposure,%20Incremental_Ids,%20incremental_ids_l2,%20Pii,%20Sensitive_Data_Exposure,%20sensitive_data_exposure_l2&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           echo "Tier 7 Categories will be run: 'Excessive_Data_Exposure' 'Incremental_Ids' 'Incremental_ids_l2' 'PII' 'Sensitive_Data_Exposure' 'Sensitive_data_exposure_l2' " ;
                           echo " "
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           echo "The request is $url" ;
                           data=$(curl -s --location --request POST "$url" --header "Authorization: Bearer "$token"" | jq -r '.["data"]');;
 
-                 *)       URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
+                 *)       URL="${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&categories=${CAT}&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" ;
                           url=$( echo "$URL" | sed 's/ /%20/g' ) ;
                           #echo "Default Category will be run: 'Broken_Authentication' "
                           echo " "
@@ -659,7 +777,7 @@ if [ "$runId" == null ]
 then
           echo "RunId = " "$runId"
           echo "Invalid runid"
-          echo $(curl -s --location --request POST "${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${JOB_NAME}&region=${REGION}&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" --header "Authorization: Bearer "$token"" | jq -r '.["data"]|.id')
+          echo $(curl -s --location --request POST "${FX_HOST}/api/v1/runs/project/${FX_PROJECT_NAME}?jobName=${PROFILE_NAME}&region=${REGION}&emailReport=${FX_EMAIL_REPORT}&reportType=${FX_REPORT_TYPE}${FX_SCRIPT}" --header "Authorization: Bearer "$token"" | jq -r '.["data"]|.id')
           exit 1
 fi
 
@@ -683,15 +801,31 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
 
 
                 if [ "$taskStatus" == "COMPLETED" ];then
-            echo "------------------------------------------------"
-                       # echo  "Run detail link ${FX_HOST}/${array[7]}"
+                        echo "------------------------------------------------"
+                        #echo  "Run detail link ${FX_HOST}/${array[7]}"
                         echo  "Run detail link ${FX_HOST}${array[7]}"
                         echo "-----------------------------------------------"
                         echo "Scan Successfully Completed"
                         echo " "
-			if [ "$OUTPUT_FILENAME" != "" ];then
+                        if [ "$FX_EMAIL_REPORT" = true ]; then     
+                              sleep 10
+                              echo "Will wait for 10 seconds"                       
+                              totalEScount=$(curl -s -X GET "${FX_HOST}/api/v1/runs/${runId}/test-suite-responses" -H "accept: */*"  --header "Authorization: Bearer "$token""  | jq -r '.data[]|.id')
+                              totalPGcount=$(curl -s -X GET "${FX_HOST}/api/v1/runs/${runId}" -H "accept: */*"  --header "Authorization: Bearer "$token""  | jq -r '.data.task.totalTests')
+                              esCount=0 
+                              for scan in ${totalEScount}
+                                  do
+                                       escount=`expr $escount + 1`
+                                  done
+                                  if [ $totalPGcount -eq $escount ]; then
+                                        echo "Email report will be sent in a short while!!"
+                                  else
+                                        echo "Email report will be sent after some delay!!"
+                                  fi
+                        fi
+			      if [ "$OUTPUT_FILENAME" != "" ];then
                               sarifoutput=$(curl -s --location --request GET "${FX_HOST}/api/v1/projects/${projectId}/sarif" --header "Authorization: Bearer "$token"" | jq  '.data')
-		              #echo $sarifoutput >> $OUTPUT_FILENAME
+		                  #echo $sarifoutput >> $OUTPUT_FILENAME
                               echo $sarifoutput >> $GITHUB_WORKSPACE/$OUTPUT_FILENAME
                		      echo "SARIF output file created successfully"
                               echo " "
@@ -790,44 +924,39 @@ while [ "$taskStatus" == "WAITING" -o "$taskStatus" == "PROCESSING" ]
                                           
                                     done
                                 echo "Found $triVulCount Trivial Severity Vulnerabilities!!!"
-                                echo " "
-
-
-                            
-                            
-                     case "$FAIL_ON_VULN_SEVERITY" in
-                         "Critical") for vul in ${severity}
-                                         do
+                                echo " "                                                        
+                                case "$FAIL_ON_VULN_SEVERITY" in 
+                                      "Critical") for vul in ${severity}
+                                                      do
                                                 
-                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] ; then
-                                                 echo "Failing script execution since we have found $cVulCount Critical severity vulnerabilities!!!"
-                                                 exit 1
+                                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] ; then
+                                                                    echo "Failing script execution since we have found $cVulCount Critical severity vulnerabilities!!!"
+                                                                    exit 1                                           
+                                                             fi                                             
+                                                      done
+                                      ;;
+                                      "High") for vul in ${severity}
+                                                      do
+                                                     
+                                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] ; then
+                                                                    echo "Failing script execution since we have found $cVulCount Critical and $hVulCount High severity vulnerabilities!!!"
+                                                                    exit 1
                                            
-                                             fi                                             
-                                        done
-                         ;;
-                        "High") for vul in ${severity}
-                                         do
+                                                             fi                                             
+                                                      done
+                                      ;;                     
+                                      "Medium") for vul in ${severity}
+                                                      do
                                                 
-                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] ; then
-                                                 echo "Failing script execution since we have found $cVulCount Critical and $hVulCount High severity vulnerabilities!!!"
-                                                 exit 1
+                                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] || [ "$vul" == "Medium"  ] ; then
+                                                                    echo "Failing script execution since we have found $cVulCount Critical, $hVulCount High and $medVulCount Medium severity vulnerabilities!!!"
+                                                                    exit 1
                                            
-                                             fi                                             
-                                        done
-                         ;;
-                        "Medium") for vul in ${severity}
-                                         do
-                                                
-                                             if  [ "$vul" == "Critical"  ] || [ "$vul" == "High"  ] || [ "$vul" == "Medium"  ] ; then
-                                                 echo "Failing script execution since we have found $cVulCount Critical, $hVulCount High and $medVulCount Medium severity vulnerabilities!!!"
-                                                 exit 1
-                                           
-                                             fi                                             
-                                        done
-                        ;;
-                      *)                          
-                     esac
+                                                             fi                                             
+                                                      done
+                                      ;;
+                                   *)                          
+                                esac
 
                         fi 
                         exit 0
